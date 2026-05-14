@@ -24,13 +24,16 @@ app.listen(port, async (err?: Error) => {
   logger.info({ port }, "Express server listening");
   memoryStore.setStep("server_ready");
 
-  // Step 4: Start Telegram bot
-  try {
-    await startBot();
-    logger.info("[Main] Telegram bot started successfully");
-    memoryStore.setStep("bot_running");
-  } catch (botErr) {
-    logger.error({ botErr }, "[Main] Failed to start Telegram bot");
-    process.exit(1);
-  }
+  // Step 4: Start Telegram bot (non-blocking — server stays up even if bot has issues)
+  startBot()
+    .then(() => {
+      logger.info("[Main] Telegram bot started successfully");
+      memoryStore.setStep("bot_running");
+    })
+    .catch((botErr: unknown) => {
+      const msg = botErr instanceof Error ? botErr.message : JSON.stringify(botErr);
+      logger.error({ msg }, "[Main] Telegram bot failed to start — check TELEGRAM_BOT_TOKEN");
+      memoryStore.setStep("bot_failed");
+      // Don't exit — Express server keeps running for health checks
+    });
 });
