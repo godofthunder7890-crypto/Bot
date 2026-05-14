@@ -1,0 +1,6 @@
+{"error":"Missing required environment variables: TELEGRAM_BOT_TOKEN, TELEGRAM_ADMIN_CHAT_ID, GEMINI_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY","level":"error","message":"Configuration validation failed","timestamp":"2026-05-14 12:13:55"}
+{"level":"warn","message":"Starting in limited mode — some features may not work","timestamp":"2026-05-14 12:13:55"}
+{"error":"TELEGRAM_BOT_TOKEN is not set","level":"error","message":"Failed to start Telegram bot","timestamp":"2026-05-14 12:13:55"}
+{"level":"warn","message":"Bot not running — set TELEGRAM_BOT_TOKEN to enable","timestamp":"2026-05-14 12:13:55"}
+{"botEnabled":false,"env":"development","level":"info","message":"Telegram AI Reel Automation System started","port":3000,"timestamp":"2026-05-14 12:13:55"}
+{"level":"info","message":"HTTP server running on port 3000","timestamp":"2026-05-14 12:13:55"}
