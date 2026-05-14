@@ -1,76 +1,37 @@
-# AGENT_MEMORY.md
-*Last Updated: 2026-05-14T07:43:41.525Z*
+# AGENT MEMORY — Telegram Reel Bot
 
-## Current Project Status
-Running
+> Auto-updated every save. Last update: 2026-05-14T00:00:00.000Z
 
-## Project Overview
-Telegram AI Reel Automation System — generates AI-powered short-form videos
-and sends them to Telegram admin for approval.
+## System Info
+| Field | Value |
+|-------|-------|
+| Version | 2.0.0 |
+| Bot Started | 2026-05-14T00:00:00.000Z |
+| Last Restart | 2026-05-14T00:00:00.000Z |
+| Last Step | `system_boot` |
+| Deployment | idle |
+| Railway URL | Not set |
+| Last GitHub Commit | None |
 
-## Completed Features
-- Telegram bot with full command set (/start, /newreel, /approve, /delete, /schedule, /stats)
-- Gemini AI script and caption generation
-- AI voice generation (ElevenLabs + Google TTS fallback)
-- Pexels stock footage fetching
-- FFmpeg 9:16 vertical reel rendering with subtitles
-- Draft approval system via inline keyboard
-- Reel scheduling with cron jobs
-- Supabase database (reels, schedules, analytics, logs)
-- Winston logging (file + Supabase persistence)
-- GitHub auto-push integration
-- Express.js health check server
-- Railway deployment configuration
+## Reel Stats
+| Metric | Count |
+|--------|-------|
+| Completed Reels | 0 |
+| Total Generated | 0 |
+| Pending Jobs | 0 |
+| Failed Jobs | 0 |
 
-## Pending Tasks
-- Connect real Telegram bot token
-- Configure Gemini API key
-- Set Pexels API key for stock footage
-- Optional: ElevenLabs for premium voice
-- Deploy to Railway
+## API Usage
+| API | Calls |
+|-----|-------|
+| Gemini | 0 |
+| ElevenLabs | 0 |
+| Pexels | 0 |
+| Pixabay | 0 |
+| Firebase | 0 |
 
-## APIs Used
-| API | Purpose | Required |
-|-----|---------|----------|
-| Telegram Bot API | Bot control, messaging | YES |
-| Google Gemini | Script/caption generation | YES |
-| Supabase | Database, storage | YES |
-| Pexels | Free stock footage | Recommended |
-| ElevenLabs | AI voice generation | Optional |
-| GitHub | Code repository, auto-push | Optional |
+## Pending Reels
+_No pending reels_
 
-## Deployment Status
-- Platform: Railway (railway.toml configured)
-- Node version: 18+
-- Environment: All secrets in .env / Railway env vars
-
-## Current Bugs
-- None known
-
-## Folder Explanations
-```
-/bot          - Telegram bot handlers, commands, keyboards, messages
-/services     - Core services: AI, voice, stock footage, analytics, logger
-/render       - FFmpeg rendering pipeline and utilities
-/templates    - Subtitle and video templates
-/storage      - Generated reels and temp files (gitignored)
-/config       - App config, Supabase client
-/logs         - Log files (gitignored)
-/docs         - Documentation files
-```
-
-## How to Continue This Project
-1. Clone the repository
-2. Run `npm install`
-3. Copy `.env.example` to `.env` and fill in API keys
-4. Run `node index.js`
-5. Reference SETUP_GUIDE.md for full instructions
-
-## Future Roadmap
-- Multi-platform posting (Instagram, TikTok)
-- Background music library
-- Template system for different reel styles
-- AI thumbnail generation
-- Analytics dashboard web UI
-- Batch reel generation
-- Custom voice training
+## Failed Jobs
+_No failed jobs_
