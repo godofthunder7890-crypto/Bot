@@ -6,10 +6,10 @@ let _client: ReturnType<typeof createClient> | null = null;
 
 export function getSupabase() {
   if (!_client) {
-    _client = createClient(
-      secrets.get("SUPABASE_URL"),
-      secrets.get("SUPABASE_SERVICE_ROLE_KEY"),
-    );
+    // Strip any accidental path suffixes from the URL (e.g. /rest/v1/)
+    const rawUrl = secrets.get("SUPABASE_URL");
+    const cleanUrl = rawUrl.replace(/\/(rest|auth|storage|realtime)(\/.*)?$/, "").replace(/\/$/, "");
+    _client = createClient(cleanUrl, secrets.get("SUPABASE_SERVICE_ROLE_KEY"));
   }
   return _client;
 }
