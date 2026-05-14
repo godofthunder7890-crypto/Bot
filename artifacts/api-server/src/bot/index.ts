@@ -21,25 +21,35 @@ let bot: Telegraf | null = null;
 
 function isAdmin(ctx: Context): boolean {
   const adminId = secrets.get("TELEGRAM_CHAT_ID");
-  return String(ctx.from?.id) === adminId;
-}
-
-function adminGuard(handler: (ctx: Context) => Promise<void>) {
-  return async (ctx: Context) => {
-    if (!isAdmin(ctx)) {
-      await ctx.answerCbQuery?.("⛔ Unauthorized").catch(() => {});
-      return;
-    }
-    await handler(ctx);
-  };
+  const fromId = String(ctx.from?.id ?? "");
+  const chatId = String((ctx as { chat?: { id?: number } }).chat?.id ?? "");
+  // Accept if user ID or chat ID matches
+  return fromId === adminId || chatId === adminId;
 }
 
 export function createBot(): Telegraf {
   bot = new Telegraf(secrets.get("TELEGRAM_BOT_TOKEN"));
 
+  // Log ALL incoming messages for debugging
+  bot.use(async (ctx, next) => {
+    const fromId = ctx.from?.id;
+    const updateType = ctx.updateType;
+    const data = "callbackQuery" in ctx && ctx.callbackQuery && "data" in ctx.callbackQuery
+      ? ctx.callbackQuery.data : undefined;
+    logger.info({ fromId, updateType, data }, "[Bot] Incoming update");
+    return next();
+  });
+
   // Any message from admin → show main menu
   bot.on("message", async (ctx) => {
-    if (!isAdmin(ctx)) return;
+    const fromId = ctx.from?.id;
+    const adminId = secrets.get("TELEGRAM_CHAT_ID");
+    logger.info({ fromId, adminId, match: String(fromId) === adminId }, "[Bot] Message received");
+
+    if (!isAdmin(ctx)) {
+      logger.warn({ fromId, adminId }, "[Bot] Unauthorized message — ignored");
+      return;
+    }
 
     const userId = ctx.from?.id;
     const text = "text" in ctx.message ? ctx.message.text : "";
@@ -48,6 +58,7 @@ export function createBot(): Telegraf {
     if (userId && pendingTopicInput.has(userId) && text) {
       const { niche } = pendingTopicInput.get(userId)!;
       pendingTopicInput.delete(userId);
+      logger.info({ topic: text, niche }, "[Bot] Starting reel pipeline from custom topic");
       await generateReelPipeline(ctx, text, niche);
       return;
     }
@@ -58,28 +69,33 @@ export function createBot(): Telegraf {
 
   // Callback query router
   bot.on("callback_query", async (ctx) => {
+    const fromId = ctx.from?.id;
+    const data = "data" in ctx.callbackQuery ? ctx.callbackQuery.data : "";
+    logger.info({ fromId, data }, "[Bot] Callback received");
+
     if (!isAdmin(ctx)) {
-      await ctx.answerCbQuery("⛔ Unauthorized");
+      await ctx.answerCbQuery("⛔ Unauthorized").catch(() => {});
+      logger.warn({ fromId }, "[Bot] Unauthorized callback");
       return;
     }
 
     await ctx.answerCbQuery().catch(() => {});
-    const data = "data" in ctx.callbackQuery ? ctx.callbackQuery.data : "";
     if (!data) return;
 
     const [ns, action, ...rest] = data.split(":");
+    logger.info({ ns, action, rest }, "[Bot] Routing callback");
 
     try {
       switch (ns) {
         case "menu":
           switch (action) {
-            case "main":    await showMainMenu(ctx); break;
-            case "create":  await startCreateReel(ctx); break;
-            case "drafts":  await showDrafts(ctx); break;
+            case "main":      await showMainMenu(ctx); break;
+            case "create":    await startCreateReel(ctx); break;
+            case "drafts":    await showDrafts(ctx); break;
             case "analytics": await showAnalytics(ctx); break;
             case "promotion": await showPromotion(ctx); break;
-            case "settings": await showSettings(ctx); break;
-            case "status":  await showStatus(ctx); break;
+            case "settings":  await showSettings(ctx); break;
+            case "status":    await showStatus(ctx); break;
           }
           break;
 
@@ -91,19 +107,19 @@ export function createBot(): Telegraf {
           if (action === "ai_trending") await handleAiTrendingTopics(ctx);
           else if (action === "custom")  await handleCustomTopicPrompt(ctx);
           else if (action === "select") {
-            // topic:select:0:Topic Name
             const topicName = rest.slice(1).join(":");
             const userId = ctx.from?.id;
             const pending = userId ? pendingTopicInput.get(userId) : null;
             const niche = pending?.niche ?? "general";
             if (userId) pendingTopicInput.delete(userId);
+            logger.info({ topicName, niche }, "[Bot] Starting reel pipeline from AI topic");
             await generateReelPipeline(ctx, topicName, niche);
           }
           break;
 
         case "reel":
           if (action === "approve") {
-            await ctx.editMessageText("✅ *Reel approved!*\n\nSyncing to GitHub...", { parse_mode: "Markdown" }).catch(() => {});
+            await ctx.editMessageText("✅ *Reel approved!* Syncing to GitHub...", { parse_mode: "Markdown" }).catch(() => {});
             await syncMemoryToGitHub();
             await showMainMenu(ctx);
           } else if (action === "regenerate") {
@@ -115,17 +131,15 @@ export function createBot(): Telegraf {
           break;
 
         case "draft":
-          if (action === "view")    await showDraftDetail(ctx, rest[0]!);
-          else if (action === "delete") await deleteDraft(ctx, rest[0]!);
+          if (action === "view")         await showDraftDetail(ctx, rest[0]!);
+          else if (action === "delete")   await deleteDraft(ctx, rest[0]!);
           else if (action === "approve") {
             await syncMemoryToGitHub();
-            await ctx.answerCbQuery("✅ Approved & synced to GitHub!");
+            await ctx.answerCbQuery("✅ Approved & synced!").catch(() => {});
             await showDrafts(ctx);
           }
-          else if (action === "regen") {
-            await startCreateReel(ctx);
-          }
-          else if (action === "promote") await showPromotion(ctx);
+          else if (action === "regen")    await startCreateReel(ctx);
+          else if (action === "promote")  await showPromotion(ctx);
           break;
 
         case "promo":
@@ -140,10 +154,12 @@ export function createBot(): Telegraf {
           logger.warn({ data }, "[Bot] Unknown callback");
       }
     } catch (err) {
-      logger.error({ err, data }, "[Bot] Callback handler error");
-      await ctx.reply("❌ Something went wrong. Tap below to go back.", {
-        reply_markup: { inline_keyboard: [[{ text: "🔙 Main Menu", callback_data: "menu:main" }]] },
-      }).catch(() => {});
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error({ err: msg, data }, "[Bot] Callback handler error");
+      await ctx.reply(
+        `❌ *Error:* ${msg.slice(0, 200)}\n\nTap below to go back.`,
+        { parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "🔙 Main Menu", callback_data: "menu:main" }]] } }
+      ).catch(() => {});
     }
   });
 
@@ -182,17 +198,15 @@ export async function startBot(): Promise<void> {
           const msg = err instanceof Error ? err.message : String(err);
           if (msg.includes("409") && attempt < 3) {
             logger.warn({ attempt }, "[Bot] 409 Conflict — will retry after delay");
-            resolve(); // resolve to exit this attempt, loop will retry
+            resolve();
           } else {
             logger.error({ msg }, "[Bot] launch() failed");
             reject(err);
           }
         });
-        // Consider launched if no error after 8 seconds
         setTimeout(() => { launched = true; resolve(); }, 8000);
       });
       if (launched) break;
-      // Wait before retry
       await new Promise<void>((r) => setTimeout(r, 5000 * attempt));
     } catch (err) {
       if (attempt === 3) throw err;
@@ -202,7 +216,7 @@ export async function startBot(): Promise<void> {
 
   logger.info("[Bot] Polling started successfully");
 
-  // Send startup message to admin (after launch)
+  // Send startup message to admin
   const adminChatId = secrets.get("TELEGRAM_CHAT_ID");
   const mem = memoryStore.get();
   await b.telegram
