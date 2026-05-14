@@ -84,6 +84,39 @@ export async function getAnalytics(): Promise<Record<string, number>> {
 }
 
 export async function initSupabaseTables(): Promise<void> {
-  logger.info("[Supabase] Note: Create 'reels' table manually in Supabase SQL Editor if not exists.");
-  logger.info("[Supabase] SQL: CREATE TABLE IF NOT EXISTS reels (id TEXT PRIMARY KEY, topic TEXT, niche TEXT DEFAULT 'general', status TEXT DEFAULT 'pending', script_text TEXT, voice_url TEXT, video_url TEXT, firebase_url TEXT, telegram_message_id BIGINT, error TEXT, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW());");
+  const db = getSupabase();
+
+  // Try inserting a dummy row to check if table exists, then delete it
+  // This avoids needing pg/exec_sql privileges
+  const table = db.from("reels") as AnyTable;
+  const { error: checkErr } = await table.select("id").limit(1);
+
+  if (!checkErr) {
+    logger.info("[Supabase] reels table already exists ✅");
+    return;
+  }
+
+  // Table does not exist — log SQL for manual creation
+  if (checkErr.code === "PGRST205" || checkErr.message?.includes("does not exist") || checkErr.message?.includes("schema cache")) {
+    logger.warn("[Supabase] reels table not found — please run this SQL in Supabase SQL Editor:");
+    logger.warn(`[Supabase] SQL:
+CREATE TABLE IF NOT EXISTS reels (
+  id TEXT PRIMARY KEY,
+  topic TEXT NOT NULL,
+  niche TEXT DEFAULT 'general',
+  status TEXT DEFAULT 'pending',
+  script_text TEXT,
+  voice_url TEXT,
+  video_url TEXT,
+  firebase_url TEXT,
+  telegram_message_id BIGINT,
+  error TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS reels_status_idx ON reels(status);
+CREATE INDEX IF NOT EXISTS reels_created_at_idx ON reels(created_at DESC);`);
+  } else {
+    logger.error({ err: checkErr }, "[Supabase] Unexpected error checking reels table");
+  }
 }
