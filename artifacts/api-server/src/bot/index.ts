@@ -159,27 +159,69 @@ export async function startBot(): Promise<void> {
   memoryStore.setStep("bot_polling_start");
   logger.info("[Bot] Starting polling...");
 
-  // Send startup message to admin
+  // Step 1: Clear any existing webhook/polling session
+  try {
+    await b.telegram.deleteWebhook({ drop_pending_updates: true });
+    logger.info("[Bot] Webhook cleared");
+  } catch {
+    logger.warn("[Bot] deleteWebhook failed — continuing anyway");
+  }
+
+  // Step 2: Wait 3s for Telegram servers to release the previous session
+  await new Promise<void>((r) => setTimeout(r, 3000));
+
+  // Step 3: Launch polling with retry on 409
+  let launched = false;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        b.launch({
+          allowedUpdates: ["message", "callback_query"],
+          dropPendingUpdates: true,
+        }).catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes("409") && attempt < 3) {
+            logger.warn({ attempt }, "[Bot] 409 Conflict — will retry after delay");
+            resolve(); // resolve to exit this attempt, loop will retry
+          } else {
+            logger.error({ msg }, "[Bot] launch() failed");
+            reject(err);
+          }
+        });
+        // Consider launched if no error after 8 seconds
+        setTimeout(() => { launched = true; resolve(); }, 8000);
+      });
+      if (launched) break;
+      // Wait before retry
+      await new Promise<void>((r) => setTimeout(r, 5000 * attempt));
+    } catch (err) {
+      if (attempt === 3) throw err;
+      await new Promise<void>((r) => setTimeout(r, 5000 * attempt));
+    }
+  }
+
+  logger.info("[Bot] Polling started successfully");
+
+  // Send startup message to admin (after launch)
   const adminChatId = secrets.get("TELEGRAM_CHAT_ID");
   const mem = memoryStore.get();
-  await b.telegram.sendMessage(
-    adminChatId,
-    `🟢 *Reel Agent Online* — v${mem.systemVersion}\n\n` +
-    `✅ All ${12} secrets loaded\n` +
-    `🔄 Resuming from: \`${mem.lastExecutedStep}\`\n` +
-    `📊 Completed reels: ${mem.completedReels}\n\n` +
-    `_Tap any button to get started:_`,
-    { parse_mode: "Markdown", reply_markup: {
-      inline_keyboard: [
-        [{ text: "🚀 Open Main Menu", callback_data: "menu:main" }]
-      ]
-    }},
-  ).catch(() => {});
-
-  await b.launch({
-    allowedUpdates: ["message", "callback_query"],
-    dropPendingUpdates: true,
-  });
+  await b.telegram
+    .sendMessage(
+      adminChatId,
+      `🟢 *Reel Agent Online* — v${mem.systemVersion}\n\n` +
+        `✅ All secrets loaded\n` +
+        `🔄 Resuming from: \`${mem.lastExecutedStep}\`\n` +
+        `📊 Completed reels: ${mem.completedReels}\n\n` +
+        `_Tap any button to get started:_`,
+      {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [[{ text: "🚀 Open Main Menu", callback_data: "menu:main" }]],
+        },
+      },
+    )
+    .then(() => logger.info("[Bot] Startup message sent to admin"))
+    .catch((e: unknown) => logger.warn({ e }, "[Bot] Could not send startup message"));
 
   process.once("SIGINT", () => b.stop("SIGINT"));
   process.once("SIGTERM", () => b.stop("SIGTERM"));
