@@ -21,7 +21,7 @@ export interface ReelScript {
 }
 
 export async function generateReelScript(topic: string, niche: string): Promise<ReelScript> {
-  const model = getAI().getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = getAI().getGenerativeModel({ model: "gemini-1.5-pro" });
 
   const prompt = `You are a viral short-form video script writer. Create an engaging reel script for:
 Topic: "${topic}"
@@ -57,7 +57,7 @@ Return ONLY the JSON, no markdown.`;
 }
 
 export async function generateTrendingTopics(niche: string): Promise<string[]> {
-  const model = getAI().getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = getAI().getGenerativeModel({ model: "gemini-1.5-pro" });
   const prompt = `List 10 trending viral video topics for the "${niche}" niche right now in 2025. Return as JSON array of strings only. No explanation.`;
   const result = await model.generateContent(prompt);
   const text = result.response.text().trim().replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
@@ -66,7 +66,7 @@ export async function generateTrendingTopics(niche: string): Promise<string[]> {
 }
 
 export async function generateCaption(script: ReelScript, platform: string = "Instagram"): Promise<string> {
-  const model = getAI().getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = getAI().getGenerativeModel({ model: "gemini-1.5-pro" });
   const prompt = `Write a viral ${platform} caption for this reel script:
 "${script.fullScript}"
 Include hook, value, and CTA. Add emojis. End with these hashtags: ${script.hashtags.join(" ")}
