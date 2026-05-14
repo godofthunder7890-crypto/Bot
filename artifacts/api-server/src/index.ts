@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { secrets } from "./security/secretManager";
 import { memoryStore } from "./storage/memory";
 import { startBot } from "./bot/index";
+import { initSupabaseTables } from "./services/supabase";
 
 // Step 1: Validate all secrets at startup
 secrets.validate();
@@ -24,7 +25,12 @@ app.listen(port, async (err?: Error) => {
   logger.info({ port }, "Express server listening");
   memoryStore.setStep("server_ready");
 
-  // Step 4: Start Telegram bot (non-blocking — server stays up even if bot has issues)
+  // Step 4: Init Supabase tables (non-blocking)
+  initSupabaseTables().catch((e: unknown) => {
+    logger.warn({ err: e }, "[Supabase] initSupabaseTables failed");
+  });
+
+  // Step 5: Start Telegram bot (non-blocking — server stays up even if bot has issues)
   startBot()
     .then(() => {
       logger.info("[Main] Telegram bot started successfully");
