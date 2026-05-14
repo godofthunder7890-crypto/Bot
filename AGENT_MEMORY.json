@@ -1,0 +1,18 @@
+{
+  "systemVersion": "2.0.0",
+  "lastRestartAt": "2026-05-14T00:00:00.000Z",
+  "lastExecutedStep": "system_boot",
+  "pendingReels": [],
+  "failedJobs": [],
+  "completedReels": 0,
+  "totalReelsGenerated": 0,
+  "apiUsage": {
+    "gemini": 0,
+    "elevenlabs": 0,
+    "pexels": 0,
+    "pixabay": 0,
+    "firebase": 0
+  },
+  "deploymentStatus": "idle",
+  "botStartedAt": "2026-05-14T00:00:00.000Z"
+}
